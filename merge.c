@@ -189,16 +189,16 @@ void FFTfix(fix15 fr[], fix15 fi[]) {
 
 //Direct Digital Synthesis (DDS) parameters
 #define two32 4294967296.0  // 2^32 (a constant)
-#define Fs 40000            // sample rate
+#define Fs_0 40000            // sample rate
 
 // the DDS units - core 1
 // Phase accumulator and phase increment. Increment sets output frequency.
 volatile unsigned int phase_accum_main_1;                  
-volatile unsigned int phase_incr_main_1 = (2300.0*two32)/Fs ;
+volatile unsigned int phase_incr_main_1 = (2300.0*two32)/Fs_0 ;
 // the DDS units - core 2
 // Phase accumulator and phase increment. Increment sets output frequency.
 volatile unsigned int phase_accum_main_0;
-volatile unsigned int phase_incr_main_0 = (2300.0*two32)/Fs ;
+volatile unsigned int phase_incr_main_0 = (2300.0*two32)/Fs_0 ;
 
 // DDS sine table (populated in main())
 #define sine_table_size 256
@@ -444,6 +444,134 @@ static PT_THREAD (protothread_core_0(struct pt *pt))
     PT_END(pt) ;
 }
 
+// Runs on core 0
+static PT_THREAD (protothread_fft(struct pt *pt))
+{
+    // Indicate beginning of thread
+    PT_BEGIN(pt) ;
+    printf("Starting capture\n") ;
+    // Start the ADC channel
+    dma_start_channel_mask((1u << sample_chan)) ;
+    // Start the ADC
+    adc_run(true) ;
+
+    // Declare some static variables
+    static int height ;             // for scaling display
+    static float max_freqency ;     // holds max frequency
+    static int i ;                  // incrementing loop variable
+
+    static fix15 max_fr ;           // temporary variable for max freq calculation
+    static int max_fr_dex ;         // index of max frequency
+
+    // Write some text to VGA
+    setTextColor(WHITE) ;
+    setCursor(65, 0) ;
+    setTextSize(1) ;
+    writeString("Raspberry Pi Pico") ;
+    setCursor(65, 10) ;
+    writeString("FFT demo") ;
+    setCursor(65, 20) ;
+    writeString("Hunter Adams") ;
+    setCursor(65, 30) ;
+    writeString("vha3@cornell.edu") ;
+    setCursor(250, 0) ;
+    setTextSize(2) ;
+    writeString("Max freqency:") ;
+
+    // Will be used to write dynamic text to screen
+    static char freqtext[40];
+
+
+    while(1) {
+        // Wait for NUM_SAMPLES samples to be gathered
+        // Measure wait time with timer. THIS IS BLOCKING
+        dma_channel_wait_for_finish_blocking(sample_chan);
+
+        // Copy/window elements into a fixed-point array
+        for (i=0; i<NUM_SAMPLES; i++) {
+            fr[i] = multfix15(int2fix15((int)sample_array[i]), window[i]) ;
+            fi[i] = (fix15) 0 ;
+        }
+
+        // Zero max frequency and max frequency index
+        max_fr = 0 ;
+        max_fr_dex = 0 ;
+
+        // Restart the sample channel, now that we have our copy of the samples
+        dma_channel_start(control_chan) ;
+
+        // Compute the FFT
+        FFTfix(fr, fi) ;
+
+        // Find the magnitudes (alpha max plus beta min)
+        for (int i = 0; i < (NUM_SAMPLES>>1); i++) {  
+            // get the approx magnitude
+            fr[i] = abs(fr[i]); 
+            fi[i] = abs(fi[i]);
+            // reuse fr to hold magnitude
+            fr[i] = max(fr[i], fi[i]) + 
+                    multfix15(min(fr[i], fi[i]), zero_point_4); 
+
+            // Keep track of maximum
+            if (fr[i] > max_fr && i>4) {
+                max_fr = fr[i] ;
+                max_fr_dex = i ;
+            }
+        }
+        // Compute max frequency in Hz
+        max_freqency = max_fr_dex * (Fs/NUM_SAMPLES) ;
+        if(max_freqency > 2200 && max_freqency < 2400) {
+            if(!HIGH){
+                HIGH = true;
+                if (STATE_0_cycle == 1) {
+                    if(STATE_1_cycle == 1) {
+                        printf("a new cricket detected! \n"); 
+                    } else {
+                        printf("core 0 detected a chirp\n");
+                    }
+                } else {
+                    if(STATE_1_cycle == 1) {
+                        printf("core 1 detected a chirp\n");
+                    }
+                }
+            } else {
+            HIGH = false;
+            }
+        }
+
+
+        // Display on VGA
+        fillRect(250, 20, 176, 30, BLACK); // red box
+        sprintf(freqtext, "%d", (int)max_freqency) ;
+        setCursor(250, 20) ;
+        setTextSize(2) ;
+        writeString(freqtext) ;
+
+        // Update the FFT display
+        for (int i=5; i<(NUM_SAMPLES>>1); i++) {
+            drawVLine(59+i, 50, 429, BLACK);
+            height = fix2int15(multfix15(fr[i], int2fix15(36))) ;
+            drawVLine(59+i, 479-height, height, WHITE);
+        }
+
+    }
+    PT_END(pt) ;
+}
+
+static PT_THREAD (protothread_blink(struct pt *pt))
+{
+    // Indicate beginning of thread
+    PT_BEGIN(pt) ;
+    while (1) {
+        // Toggle LED, then wait half a second
+        gpio_put(LED, !gpio_get(LED)) ;
+        PT_YIELD_usec(500000) ;
+    }
+    PT_END(pt) ;
+}
+
+
+
 
 // This is the core 1 entry point. Essentially main() for core 1
 void core1_entry() {
@@ -462,6 +590,8 @@ void core1_entry() {
 
     // Add thread to core 1
     pt_add_thread(protothread_core_1) ;
+    // Add and schedule threads
+    pt_add_thread(protothread_blink) ;
 
     // Start scheduler on core 1
     pt_schedule_start ;
@@ -511,6 +641,93 @@ int main() {
     PT_SEM_SAFE_INIT(&core_0_go, 1) ;
     PT_SEM_SAFE_INIT(&core_1_go, 0) ;
 
+    // Initialize the VGA screen
+    initVGA() ;
+
+    // Map LED to GPIO port, make it low
+    gpio_init(LED) ;
+    gpio_set_dir(LED, GPIO_OUT) ;
+    gpio_put(LED, 0) ;
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // ============================== ADC CONFIGURATION ==========================
+    //////////////////////////////////////////////////////////////////////////////
+    // Init GPIO for analogue use: hi-Z, no pulls, disable digital input buffer.
+    adc_gpio_init(ADC_PIN);
+
+    // Initialize the ADC harware
+    // (resets it, enables the clock, spins until the hardware is ready)
+    adc_init() ;
+
+    // Select analog mux input (0...3 are GPIO 26, 27, 28, 29; 4 is temp sensor)
+    adc_select_input(ADC_CHAN) ;
+
+    // Setup the FIFO
+    adc_fifo_setup(
+        true,    // Write each completed conversion to the sample FIFO
+        true,    // Enable DMA data request (DREQ)
+        1,       // DREQ (and IRQ) asserted when at least 1 sample present
+        false,   // We won't see the ERR bit because of 8 bit reads; disable.
+        true     // Shift each sample to 8 bits when pushing to FIFO
+    );
+
+    // Divisor of 0 -> full speed. Free-running capture with the divider is
+    // equivalent to pressing the ADC_CS_START_ONCE button once per `div + 1`
+    // cycles (div not necessarily an integer). Each conversion takes 96
+    // cycles, so in general you want a divider of 0 (hold down the button
+    // continuously) or > 95 (take samples less frequently than 96 cycle
+    // intervals). This is all timed by the 48 MHz ADC clock. This is setup
+    // to grab a sample at 10kHz (48Mhz/10kHz - 1)
+    adc_set_clkdiv(ADCCLK/Fs);
+
+
+    // Populate the sine table and Hann window table
+    int ii_1;
+    for (ii_1 = 0; ii_1 < NUM_SAMPLES; ii_1++) {
+        Sinewave[ii_1] = float2fix15(sin(6.283 * ((float) ii_1) / (float)NUM_SAMPLES));
+        window[ii_1] = float2fix15(0.5 * (1.0 - cos(6.283 * ((float) ii_1) / ((float)NUM_SAMPLES))));
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////
+    // ============================== ADC DMA CONFIGURATION =========================
+    /////////////////////////////////////////////////////////////////////////////////
+
+    // Channel configurations
+    dma_channel_config c2 = dma_channel_get_default_config(sample_chan);
+    dma_channel_config c3 = dma_channel_get_default_config(control_chan);
+
+
+    // ADC SAMPLE CHANNEL
+    // Reading from constant address, writing to incrementing byte addresses
+    channel_config_set_transfer_data_size(&c2, DMA_SIZE_8);
+    channel_config_set_read_increment(&c2, false);
+    channel_config_set_write_increment(&c2, true);
+    // Pace transfers based on availability of ADC samples
+    channel_config_set_dreq(&c2, DREQ_ADC);
+    // Configure the channel
+    dma_channel_configure(sample_chan,
+        &c2,            // channel config
+        sample_array,   // dst
+        &adc_hw->fifo,  // src
+        NUM_SAMPLES,    // transfer count
+        false            // don't start immediately
+    );
+
+    // CONTROL CHANNEL
+    channel_config_set_transfer_data_size(&c3, DMA_SIZE_32);      // 32-bit txfers
+    channel_config_set_read_increment(&c3, false);                // no read incrementing
+    channel_config_set_write_increment(&c3, false);               // no write incrementing
+    channel_config_set_chain_to(&c3, sample_chan);                // chain to sample chan
+
+    dma_channel_configure(
+        control_chan,                         // Channel to be configured
+        &c3,                                // The configuration we just created
+        &dma_hw->ch[sample_chan].write_addr,  // Write address (channel 0 read address)
+        &sample_address_pointer,                   // Read address (POINTER TO AN ADDRESS)
+        1,                                  // Number of transfers, in this case each is 4 byte
+        false                               // Don't start immediately.
+    );
+
     // Launch core 1
     multicore_launch_core1(core1_entry);
 
@@ -526,8 +743,10 @@ int main() {
     add_repeating_timer_us(-25, 
         repeating_timer_callback_core_0, NULL, &timer_core_0);
 
+
     // Add core 0 threads
     pt_add_thread(protothread_core_0) ;
+    pt_add_thread(protothread_fft) ;
 
     // Start scheduling core 0 threads
     pt_schedule_start ;
