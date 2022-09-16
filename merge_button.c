@@ -269,10 +269,10 @@ struct pt_sem core_1_go, core_0_go ;
 // This timer ISR is called on core 1
 bool repeating_timer_callback_core_1(struct repeating_timer *t) {
     if(gpio_get(button1) == 1) {
-        STATE_1_cycle = 1;
+        STATE_1_cycle = 0;
         count_1 = 0;
         count_1_c = 0;
-    }   
+    } else { 
     if(STATE_1_cycle == 0) {
         if (STATE_1 == 0) {
             // DDS phase and sine table lookup
@@ -330,6 +330,7 @@ bool repeating_timer_callback_core_1(struct repeating_timer *t) {
             count_1_c += 1;
         }   
     }
+    }
   // retrieve core number of execution
     corenum_1 = get_core_num() ;
 
@@ -339,10 +340,11 @@ bool repeating_timer_callback_core_1(struct repeating_timer *t) {
 // This timer ISR is called on core 0
 bool repeating_timer_callback_core_0(struct repeating_timer *t) {
     if(gpio_get(button0) == 1) {
-        STATE_0_cycle = 1;
+        STATE_0_cycle = 0;
         count_0 = 0;
         count_0_c = 0;
-    }    
+    }    else {
+
     if(STATE_0_cycle == 0) {
         if (STATE_0 == 0) {
             // DDS phase and sine table lookup
@@ -399,6 +401,7 @@ bool repeating_timer_callback_core_0(struct repeating_timer *t) {
             current_amplitude_0 = 0 ;
             count_0_c += 1;
         }   
+    }
     }
     // retrieve core number of execution
     corenum_0 = get_core_num() ;
