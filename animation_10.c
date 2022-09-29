@@ -50,6 +50,7 @@ typedef signed int fix15 ;
 #define fix2int15(a) ((int)(a >> 15))
 #define char2fix15(a) (fix15)(((fix15)(a)) << 15)
 #define divfix(a,b) (fix15)(div_s64s64( (((signed long long)(a)) << 15), ((signed long long)(b))))
+#define sqrtfix(a) (float2fix15(sqrt(fix2float15(a))))
 
 // Wall detection
 #define hitBottom(b) (b>int2fix15(380))
@@ -121,74 +122,74 @@ void drawArena() {
   drawHLine(100, 380, 440, WHITE) ;
 }
 
+
 // Detect wallstrikes, update velocity and position
 void boid_update(int cur)
 {
-    fix15* x = &(boid_list[cur]).pos_x;
+    fix15* x = &boid_list[cur].pos_x;
     fix15* y = &boid_list[cur].pos_y;
     fix15* vx = &boid_list[cur].vx;
     fix15* vy = &boid_list[cur].vy;
     
     fix15 xpos_avg = 0, ypos_avg = 0, xvel_avg = 0, yvel_avg = 0,  close_dx = 0, close_dy = 0;
-    int neighboring_boids = 0;
+    fix15 neighboring_boids = 0;
     for (int i = 0; i < 10; i++) {
-        if(i == cur) {
-            continue;
+      if(i != cur) {
+      fix15* x_o = &boid_list[i].pos_x;
+      fix15* y_o = &boid_list[i].pos_y;
+      fix15* vx_o = &boid_list[i].vx;
+      fix15* vy_o = &boid_list[i].vy;
+      // Compute differences in x and y coordinates
+      fix15 dx = *x - *x_o;
+      fix15 dy = *y - *y_o;
+
+      // Are both those differences less than the visual range?
+      if (dx < visualRange && dy < visualRange && dx > -visualRange && dy > -visualRange) {
+          // If so, calculate the squared distance
+          fix15 squared_distance = multfix15(dx,dx) + multfix15(dy,dy);
+
+          // Is squared distance less than the protected range?
+          if (squared_distance < multfix15(protectedRange,protectedRange)) { 
+
+              // If so, calculate difference in x/y-coordinates to nearfield boid
+              close_dx += dx;
+              close_dy += dy;
+          }
+
+          // If not in protected range, is the boid in the visual range?
+          else if (squared_distance < multfix15(visualRange,visualRange)) {
+
+              // Add other boid's x/y-coord and x/y vel to accumulator variables
+              xpos_avg += *x_o;
+              ypos_avg += *y_o;
+              xvel_avg += *vx_o;
+              yvel_avg += *vy_o;
+
+              // Increment number of boids within visual range
+              neighboring_boids += int2fix15(1);
+          }
         }
-    fix15* x_o = &boid_list[i].pos_x;
-    fix15* y_o = &boid_list[i].pos_y;
-    fix15* vx_o = &boid_list[i].vx;
-    fix15* vy_o = &boid_list[i].vy;
-    // Compute differences in x and y coordinates
-    fix15 dx = *x - *x_o;
-    fix15 dy = *y - *y_o;
-
-        // Are both those differences less than the visual range?
-        if (abs(dx) < visualRange && abs(dy) < visualRange) {
-            // If so, calculate the squared distance
-            fix15 squared_distance = dx*dx + dy*dy;
-
-            // Is squared distance less than the protected range?
-            if (squared_distance < protectedRange * protectedRange) { 
-
-                // If so, calculate difference in x/y-coordinates to nearfield boid
-                close_dx += dx;
-                close_dy += dy;
-            }
-
-            // If not in protected range, is the boid in the visual range?
-            else if (squared_distance < visualRange * visualRange) {
-
-                // Add other boid's x/y-coord and x/y vel to accumulator variables
-                xpos_avg += *x_o;
-                ypos_avg += *y_o;
-                xvel_avg += *vx_o;
-                yvel_avg += *vy_o;
-
-                // Increment number of boids within visual range
-                neighboring_boids += 1;
-            }
-        }    
+      }    
     }
 
     // If there were any boids in the visual range . . .            
     if (neighboring_boids > 0) {
 
         // Divide accumulator variables by number of boids in visual range
-        xpos_avg = xpos_avg/neighboring_boids;
-        ypos_avg = ypos_avg/neighboring_boids;
-        xvel_avg = xvel_avg/neighboring_boids;
-        yvel_avg = yvel_avg/neighboring_boids;
+        xpos_avg = divfix(xpos_avg,neighboring_boids);
+        ypos_avg = divfix(ypos_avg,neighboring_boids);
+        xvel_avg = divfix(xvel_avg,neighboring_boids);
+        yvel_avg = divfix(yvel_avg,neighboring_boids);
 
         // Add the centering/matching contributions to velocity
-        *vx = (*vx + (xpos_avg - *x) * centeringfactor +  (xvel_avg - *vx) * matchingfactor);                      
+        *vx = *vx + multfix15((xpos_avg - *x),centeringfactor) +  multfix15((xvel_avg - *vx), matchingfactor);                      
 
-        *vy = (*vy + (ypos_avg - *y) * centeringfactor + (yvel_avg - *vy) * matchingfactor);
+        *vy = *vy + multfix15((ypos_avg - *y),centeringfactor) +  multfix15((yvel_avg - *vy), matchingfactor);
     } 
 
     // Add the avoidance contribution to velocity
-    *vx = *vx + (close_dx * avoidfactor);
-    *vy = *vy + (close_dy * avoidfactor);
+    *vx = *vx + multfix15(close_dx,avoidfactor);
+    *vy = *vy + multfix15(close_dy,avoidfactor);
   
 
     // If the boid is near an edge, make it turn by turnfactor
@@ -206,32 +207,33 @@ void boid_update(int cur)
         *vx = *vx + turnfactor;
     } 
 
-    // // If the boid has a bias, bias it!
-    // // biased to right of screen
-    // if (cur >= 0 && cur < 5) {
-    //     *vx = (1 - biasval) * (*vx) + (biasval * 1);
-    // }
+    // If the boid has a bias, bias it!
+    // biased to right of screen
+    if (cur >= 0 && cur < 5) {
+        *vx = multfix15((int2fix15(1) - biasval),(*vx)) + biasval;
+    }
         
-    // // biased to left of screen
-    // else if (cur >= 5 && cur < 10) {
-    //     *vx = (1 - biasval) * (*vx) + (biasval * (-1));
-    // }
+    // biased to left of screen
+    else if (cur >= 5 && cur < 10) {
+        *vx = multfix15((int2fix15(1) - biasval),(*vx)) - biasval;
+    }
        
 
     // // Calculate the boid's speed
     // // Slow step! Lookup the "alpha max plus beta min" algorithm
-    // fix15 speed = sqrt((*vx) * (*vx) + (*vy) * (*vy));
+    fix15 temp_add = multfix15(*vx,*vx) + multfix15(*vy,*vy);
+    fix15 speed = sqrtfix( temp_add );
 
     // // Enforce min and max speeds
-    // if (speed < minspeed) {
-    //     *vx = (*vx / speed) * minspeed;
-    //     *vy = (*vy / speed) * minspeed;
-    // }
+    if (speed < minspeed) {
+         *vx = multfix15(divfix(*vx,speed),minspeed);
+         *vy = multfix15(divfix(*vy,speed),minspeed);
+    }
 
-    // if (speed > maxspeed) {
-    //     *vx = (*vx / speed) * maxspeed;
-    //     *vy = (*vy / speed) * maxspeed;
-    // }
+    if (speed > maxspeed) {
+         *vx = multfix15(divfix(*vx,speed),maxspeed);
+         *vy = multfix15(divfix(*vy,speed),maxspeed);
+    }
 
 
     // Update position using velocity
@@ -313,11 +315,6 @@ static PT_THREAD (protothread_anim(struct pt *pt))
       printf("spare time: %d us \n ", spare_time);
       printf("time elapsd: %d s\n", time_us_32()/1000000);
 
-      // Display on VGA
-      fillRect(250, 20, 176, 30, BLACK); // red box
-      writeString("number of boids: 1 \n");
-      setCursor(250, 20) ;
-      setTextSize(2) ;
 
       // yield for necessary amount of time
       PT_YIELD_usec(spare_time) ;
