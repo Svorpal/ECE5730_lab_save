@@ -199,12 +199,9 @@ static PT_THREAD (protothread_anim(struct pt *pt))
       drawArena() ;
       // delay in accordance with frame rate
       spare_time = FRAME_RATE - (time_us_32() - begin_time) ;
-
-
       printf("number of boids: 1 \n");
       printf("spare time: %d us \n ", spare_time);
       printf("time elapsd: %d s\n", time_us_32()/1000000);
-
       // yield for necessary amount of time
       PT_YIELD_usec(spare_time) ;
      // NEVER exit while
