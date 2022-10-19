@@ -85,6 +85,7 @@ void on_pwm_wrap() {
     // Clear the interrupt flag that brought us here
     pwm_clear_irq(pwm_gpio_to_slice_num(5));
 
+    
 
     // Update duty cycle
     if (control!=old_control) {
@@ -96,10 +97,10 @@ void on_pwm_wrap() {
         } else {
             pwm_set_chan_level(slice_num, PWM_CHAN_B, (-1)*control);
             pwm_set_chan_level(slice_num, PWM_CHAN_A, 0);
-            pwm_on_time = (-1) * control;
+            pwm_on_time = control;
         }
     }
-            
+
     // Gather measurements
     mpu6050_read_raw(acceleration, gyro);
 
@@ -114,11 +115,8 @@ void on_pwm_wrap() {
 
     motor_disp = motor_disp + ((pwm_on_time - motor_disp)>>6) ;
 
-    // Read the IMU
-    // NOTE! This is in 15.16 fixed point. Accel in g's, gyro in deg/s
-    // If you want these values in floating point, call fix2float15() on
-    // the raw measurements.
-    mpu6050_read_raw(acceleration, gyro);
+
+            
 
     // Signal VGA to draw
     PT_SEM_SIGNAL(pt, &vga_semaphore);
@@ -179,10 +177,10 @@ static PT_THREAD (protothread_vga(struct pt *pt))
     sprintf(screentext, "0") ;
     setCursor(50, 350) ;
     writeString(screentext) ;
-    sprintf(screentext, "+2") ;
+    sprintf(screentext, "+25") ;
     setCursor(50, 280) ;
     writeString(screentext) ;
-    sprintf(screentext, "-2") ;
+    sprintf(screentext, "-25") ;
     setCursor(50, 425) ;
     writeString(screentext) ;
 
@@ -194,10 +192,10 @@ static PT_THREAD (protothread_vga(struct pt *pt))
     sprintf(screentext, "0") ;
     setCursor(50, 150) ;
     writeString(screentext) ;
-    sprintf(screentext, "+250") ;
+    sprintf(screentext, "+5.00") ;
     setCursor(45, 75) ;
     writeString(screentext) ;
-    sprintf(screentext, "-250") ;
+    sprintf(screentext, "-5.00") ;
     setCursor(45, 225) ;
     writeString(screentext) ;
     
@@ -213,15 +211,14 @@ static PT_THREAD (protothread_vga(struct pt *pt))
             throttle = 0 ;
 
             // Erase a column
-            drawVLine(xcoord, 0, 480, BLACK) ;
-
+           drawVLine(xcoord, 0, 480, BLACK) ;
 
 
             // Draw bottom plot 
-            drawPixel(xcoord, 430 - (int)(NewRange*((float)((fix2float15(acceleration[2])*120.0)-OldMin)/OldRange)), RED) ;
+            drawPixel(xcoord, 430 - (225 - 75) / 2 - fix2int15(complementary_angle) * 3, RED) ;
 
-            // // Draw top plot
-            drawPixel(xcoord, motor_disp, GREEN) ;
+            // Draw top plot
+            drawPixel(xcoord, 230 - (225 - 75) / 2 - motor_disp / 63, GREEN) ;
 
             // Update horizontal cursor
             if (xcoord < 609) {
