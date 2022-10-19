@@ -205,12 +205,6 @@ static PT_THREAD (protothread_anim(struct pt *pt))
       printf("spare time: %d us \n ", spare_time);
       printf("time elapsd: %d s\n", time_us_32()/1000000);
 
-      // Display on VGA
-      fillRect(250, 20, 176, 30, BLACK); // red box
-      writeString("number of boids: 1 \n");
-      setCursor(250, 20) ;
-      setTextSize(2) ;
-
       // yield for necessary amount of time
       PT_YIELD_usec(spare_time) ;
      // NEVER exit while
