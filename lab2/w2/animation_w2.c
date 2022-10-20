@@ -339,11 +339,9 @@ static PT_THREAD (protothread_anim(struct pt *pt))
 {
     // Mark beginning of thread
     PT_BEGIN(pt);
-
     // Variables for maintaining frame rate
     static int begin_time ;
     static int spare_time ;
-
     for(int i = 0; i < 50; i++) {
         boid_initialize(&boid_list[i]);
         if (i >= 0 && i < 25) {
@@ -354,34 +352,26 @@ static PT_THREAD (protothread_anim(struct pt *pt))
         }
         spawnBoid(&boid_list[i].pos_x, &boid_list[i].pos_y, &boid_list[i].vx, &boid_list[i].vy);
     }
-
     while(1) {
       // Measure time at start of thread
       begin_time = time_us_32() ;      
-    
      for(int i = 0; i < 50; i++) {
         // erase boid
         drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, BLACK);
         // update boid's position and velocity
         boid_update(i) ;
         }
-
       // draw the boid at its new position
         for(int i = 0; i < 50; i++) {
             drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, boid_list[i].color); 
         }
-    
       // draw the boundaries
       drawArena(bound_type) ;
       // delay in accordance with frame rate
       spare_time = FRAME_RATE - (time_us_32() - begin_time) ;
-
-
       printf("number of boids: 1 \n");
       printf("spare time: %d us \n ", spare_time);
       printf("time elapsd: %d s\n", time_us_32()/1000000);
-
-
       // yield for necessary amount of time
       PT_YIELD_usec(spare_time) ;
      // NEVER exit while
