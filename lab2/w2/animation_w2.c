@@ -332,7 +332,7 @@ static PT_THREAD (protothread_serial(struct pt *pt))
         }
       } // END WHILE(1)
   PT_END(pt);
-} // timer thread
+}
 
 // Animation on core 0
 static PT_THREAD (protothread_anim(struct pt *pt))
