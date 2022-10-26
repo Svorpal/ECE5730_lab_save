@@ -47,6 +47,7 @@
 // a PWM frequency of 1 kHz.
 #define WRAPVAL 5000
 #define CLKDIV 25.0f
+#define max_duty_cycle 5000;
 
 // Variable to hold PWM slice number
 uint slice_num  = 0;
@@ -63,9 +64,14 @@ fix15 accel_angle = int2fix15(0);
 fix15 gyro_angle_delta = int2fix15(0);
 volatile int pwm_on_time = 0;
 volatile int motor_disp = 0;
-int Para_P = 2000;
-int Para_I ;
-int Para_D ;
+volatile int Para_P = 200;
+volatile int Para_I ;
+volatile int Para_D ;
+fix15 error_accumulation = 0;
+fix15 Imax = 1500;
+fix15 desired_angle = 0;
+fix15 angle_increment = 0.0001;
+fix15 prev_error = 0;
 
 // character array
 char screentext[40];
@@ -89,9 +95,35 @@ void on_pwm_wrap() {
     pwm_clear_irq(pwm_gpio_to_slice_num(5));
 
     
+    // Compute the error
+    // error = (desired_angle - complementary_angle) ;
+    fix15 error = complementary_angle - desired_angle;
+
+    // Start with angle_increment = 0.0001
+    if (error < int2fix15(0)) {
+        desired_angle -= angle_increment ;
+    }
+    else {
+        desired_angle += angle_increment ;
+    }
+
+    // Integrate the error
+    error_accumulation += error ;
+    // Clamp the integrated error (start with Imax = max_duty_cycle/2)
+    if (error_accumulation > Imax) {
+        error_accumulation = Imax ;
+    }
+    if (error_accumulation < multfix15(-1,Imax)) {
+        error_accumulation = multfix15(-1,Imax) ;
+    } 
+
+    // Approximate the rate of change of the error
+    fix15 error_deriv = (error - prev_error) ;
 
     // Update duty cycle
-    control = fix2int15(complementary_angle) * Para_P;
+    control = fix2int15((multfix15(int2fix15(Para_P) , error)) + multfix15(int2fix15(Para_I) , error_accumulation) + multfix15(int2fix15(Para_D) , error_deriv)) ;
+    prev_error = error ;
+    
     if (control!=old_control) {
         old_control = control ;
         if (control >= 0) {
@@ -168,7 +200,7 @@ static PT_THREAD (protothread_serial(struct pt *pt))
 
         } else {
         Para_D = test_in;
-        printf("Parameter P is set to %d.\n\r",Para_D);
+        printf("Parameter D is set to %d.\n\r",Para_D);
         }
     }
     PT_END(pt) ;
