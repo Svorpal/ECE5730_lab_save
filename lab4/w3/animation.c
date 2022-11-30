@@ -319,24 +319,24 @@ void boid_update(int cur)
 
     if(*atHome) {
       if(*x >= int2fix15(270) && *x <= int2fix15(370) && *y <= int2fix15(390)) {
-        *y = int2fix15(390);
-        *vy = 0;
+        *y = int2fix15(395);
+        *vy = 1;
       }
       if(*x >= int2fix15(270) && *x <= int2fix15(370) && *y >= int2fix15(440)) {
-        *y = int2fix15(440);
-        *vy = 0;
+        *y = int2fix15(435);
+        *vy = -1;
       }
       if(*y >= int2fix15(390) && *y <= int2fix15(440) && *x <= int2fix15(270)) {
-        *x = int2fix15(270);
-        *vx = 0;
+        *x = int2fix15(275);
+        *vx = 1;
       }
       if(*y >= int2fix15(390) && *y <= int2fix15(440) && *x >= int2fix15(370)) {
-        *x = int2fix15(370);
-        *vx = 0;
+        *x = int2fix15(365);
+        *vx = -1;
       }
     }
-    else{
-      if(*x >= int2fix15(540)) {
+
+    if(*x >= int2fix15(540)) {
       *x = int2fix15(540);
       *vx = 0;
     } 
@@ -355,7 +355,6 @@ void boid_update(int cur)
     if(*y <= int2fix15(100)) {
       *y = int2fix15(100);
       *vy = 0;
-    }
     }
     
 }
