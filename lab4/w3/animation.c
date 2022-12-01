@@ -34,6 +34,7 @@
 #include "pico/divider.h"
 #include "pico/multicore.h"
 // Include hardware libraries
+#include "hardware/adc.h"
 #include "hardware/pio.h"
 #include "hardware/dma.h"
 #include "hardware/clocks.h"
@@ -319,24 +320,24 @@ void boid_update(int cur)
 
     if(*atHome) {
       if(*x >= int2fix15(270) && *x <= int2fix15(370) && *y <= int2fix15(390)) {
-        *y = int2fix15(395);
-        *vy = 1;
+        *y = int2fix15(390);
+        *vy = 0;
       }
       if(*x >= int2fix15(270) && *x <= int2fix15(370) && *y >= int2fix15(440)) {
-        *y = int2fix15(435);
-        *vy = -1;
+        *y = int2fix15(440);
+        *vy = 0;
       }
       if(*y >= int2fix15(390) && *y <= int2fix15(440) && *x <= int2fix15(270)) {
-        *x = int2fix15(275);
-        *vx = 1;
+        *x = int2fix15(270);
+        *vx = 0;
       }
       if(*y >= int2fix15(390) && *y <= int2fix15(440) && *x >= int2fix15(370)) {
-        *x = int2fix15(365);
-        *vx = -1;
+        *x = int2fix15(370);
+        *vx = 0;
       }
     }
-
-    if(*x >= int2fix15(540)) {
+    else{
+      if(*x >= int2fix15(540)) {
       *x = int2fix15(540);
       *vx = 0;
     } 
@@ -355,6 +356,7 @@ void boid_update(int cur)
     if(*y <= int2fix15(100)) {
       *y = int2fix15(100);
       *vy = 0;
+    }
     }
     
 }
@@ -529,6 +531,14 @@ int main(){
   gpio_set_dir(button_s, GPIO_IN);
   gpio_init(button_d);
   gpio_set_dir(button_d, GPIO_IN);
+
+  adc_init();
+  adc_gpio_init(26);
+  adc_select_input(0);
+  uint16_t result = adc_read();
+  float voltage = result * (3.3/4095.0);
+  printf(" ADC Raw Value = %d Voltage = %f \r\n", result, voltage);
+  
   // initialize VGA
   initVGA() ;
 
