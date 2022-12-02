@@ -87,7 +87,7 @@ fix15 turnfactor = float2fix15(0.2);
 fix15 visualRange = float2fix15(40);
 fix15 protectedRange = float2fix15(8);
 fix15 sheepDogRange = float2fix15(50);
-fix15 sheepwolfRange = float2fix15(10);
+fix15 sheepwolfRange = float2fix15(3);
 fix15 centeringfactor = float2fix15(0.0005);
 fix15 avoidfactor = float2fix15(0.05);
 fix15 matchingfactor = float2fix15(0.05);
@@ -267,8 +267,10 @@ void boid_update(int cur)
     if (squared_distance_sw < multfix15(sheepwolfRange,sheepwolfRange)&& sheep_wolf_dx < sheepwolfRange && sheep_wolf_dy < sheepwolfRange && sheep_wolf_dx > multfix15(int2fix15(-1),sheepwolfRange) && sheep_wolf_dy > multfix15(int2fix15(-1),sheepwolfRange)) { 
         if(!(*atHome)){
           *isalive = false;
+          drawRect(fix2int15(boid_list[cur].pos_x), fix2int15(boid_list[cur].pos_y), 2, 2, BLACK);
           boid_alive_num--;
           boid_dead_num++;
+          return;
         }
     }
     if(!(*isalive)) {
@@ -303,9 +305,9 @@ void boid_update(int cur)
             fix15* vy_o = &boid_list[i].vy;
             bool* atHome_o = &boid_list[i].inCage;
             bool* isalive_o = &boid_list[i].alive;
-            if(atHome_o || !(isalive_o)) {
-              continue;
-            }
+            // if(atHome_o || !(isalive_o)) {
+            //   continue;
+            // }
             // Compute differences in x and y coordinates
             fix15 dx = *x - *x_o;
             fix15 dy = *y - *y_o;
@@ -363,13 +365,8 @@ void boid_update(int cur)
       *vx = float2fix15(home_speed *  (float) cos ((double) random_angle));
       *vy = float2fix15(home_speed *  (float) sin ((double) random_angle));
     }
-    bool*  prev_safe =  &boid_list[cur].inCage;
-    boundary_check(cur);
-    bool* after_safe = &boid_list[cur].inCage;
-    // if(*prev_safe != *after_safe) {
-    //   boid_safe_num++;
-    // }
 
+    boundary_check(cur);
 
     // // Calculate the boid's speed
     // // Slow step! Lookup the "alpha max plus beta min" algorithm
@@ -575,14 +572,15 @@ static PT_THREAD (protothread_anim(struct pt *pt))
       drawRect(fix2int15(shep.pos_x) - 2, fix2int15(shep.pos_y) - 2, 5, 5, BLACK);
       drawRect(fix2int15(wolf.pos_x) - 2, fix2int15(wolf.pos_y) - 2, 5, 5, BLACK);  
       for(int i = 0; i < boid_total_num; i++) {
-
+        if(boid_list[i].alive == false) {
+          continue;
+        }
         // erase boids
         drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, BLACK);
         // update boid's position and velocity
         boid_update(i) ;
-        // if(&boid_list[i].alive) {
-          drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, boid_list[i].color); 
-        // }
+        drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, boid_list[i].color); 
+
       }
       dog_update();
       drawRect(fix2int15(shep.pos_x) - 2, fix2int15(shep.pos_y) - 2, 5, 5, RED);
