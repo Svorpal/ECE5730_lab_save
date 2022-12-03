@@ -77,8 +77,8 @@ typedef signed int fix15 ;
 #define button_d1  5
 
 // global variables
-int boid_total_num = 150;
-int boid_alive_num = 150;
+int boid_total_num = 200;
+int boid_alive_num = 200;
 int boid_safe_num = 0;
 int boid_dead_num = 0;
 
@@ -86,15 +86,15 @@ int boid_dead_num = 0;
 fix15 turnfactor = float2fix15(0.2);
 fix15 visualRange = float2fix15(40);
 fix15 protectedRange = float2fix15(8);
-fix15 sheepDogRange = float2fix15(50);
-fix15 sheepwolfRange = float2fix15(3);
+fix15 sheepDogRange = float2fix15(35);
+fix15 sheepwolfRange = float2fix15(5);
 fix15 centeringfactor = float2fix15(0.0005);
 fix15 avoidfactor = float2fix15(0.05);
 fix15 matchingfactor = float2fix15(0.05);
 fix15 maxspeed = float2fix15(3);
 fix15 minspeed = float2fix15(0);
 fix15 maxdogspeed = float2fix15(10);
-fix15 sheep_shift_factor = float2fix15(0.1);
+fix15 sheep_shift_factor = float2fix15(0.05);
 
 
 
@@ -251,9 +251,7 @@ void boid_update(int cur)
     fix15* vy = &boid_list[cur].vy;
     bool* atHome = &boid_list[cur].inCage;
     bool* isalive = &boid_list[cur].alive;
-    if(!(*isalive)) {
-      return;
-    }
+
     fix15* x_wolf = &wolf.pos_x;
     fix15* y_wolf = &wolf.pos_y;
     fix15* vx_wolf = &wolf.vx;
@@ -264,7 +262,7 @@ void boid_update(int cur)
     fix15 sheep_wolf_dx = *x - *x_wolf;
     fix15 sheep_wolf_dy = *y - *y_wolf;
     fix15 squared_distance_sw = multfix15(sheep_wolf_dx,sheep_wolf_dx) + multfix15(sheep_wolf_dy,sheep_wolf_dy);
-    if (squared_distance_sw < multfix15(sheepwolfRange,sheepwolfRange)&& sheep_wolf_dx < sheepwolfRange && sheep_wolf_dy < sheepwolfRange && sheep_wolf_dx > multfix15(int2fix15(-1),sheepwolfRange) && sheep_wolf_dy > multfix15(int2fix15(-1),sheepwolfRange)) { 
+    if (squared_distance_sw < multfix15(sheepwolfRange,sheepwolfRange) && sheep_wolf_dx < sheepwolfRange && sheep_wolf_dy < sheepwolfRange && sheep_wolf_dx > multfix15(int2fix15(-1),sheepwolfRange) && sheep_wolf_dy > multfix15(int2fix15(-1),sheepwolfRange)) { 
         if(!(*atHome)){
           *isalive = false;
           drawRect(fix2int15(boid_list[cur].pos_x), fix2int15(boid_list[cur].pos_y), 2, 2, BLACK);
@@ -298,45 +296,45 @@ void boid_update(int cur)
           fix15 xpos_avg = 0, ypos_avg = 0, xvel_avg = 0, yvel_avg = 0,  close_dx = 0, close_dy = 0;
           fix15 neighboring_boids = 0;
           for (int i = 0; i < boid_total_num; i++) {
-            if(i != cur) {
-            fix15* x_o = &boid_list[i].pos_x;
-            fix15* y_o = &boid_list[i].pos_y;
-            fix15* vx_o = &boid_list[i].vx;
-            fix15* vy_o = &boid_list[i].vy;
-            bool* atHome_o = &boid_list[i].inCage;
-            bool* isalive_o = &boid_list[i].alive;
-            // if(atHome_o || !(isalive_o)) {
-            //   continue;
-            // }
-            // Compute differences in x and y coordinates
-            fix15 dx = *x - *x_o;
-            fix15 dy = *y - *y_o;
-            // Are both those differences less than the visual range?
-            if (dx < visualRange && dy < visualRange && dx > -visualRange && dy > -visualRange) {
-                // If so, calculate the squared distance
-                fix15 squared_distance = multfix15(dx,dx) + multfix15(dy,dy);
+            if(i != cur && boid_list[i].alive && !boid_list[i].inCage) {
+              fix15* x_o = &boid_list[i].pos_x;
+              fix15* y_o = &boid_list[i].pos_y;
+              fix15* vx_o = &boid_list[i].vx;
+              fix15* vy_o = &boid_list[i].vy;
+              bool* atHome_o = &boid_list[i].inCage;
+              bool* isalive_o = &boid_list[i].alive;
+              // if(!(isalive_o)) {
+              //   continue;
+              // }
+              // Compute differences in x and y coordinates
+              fix15 dx = *x - *x_o;
+              fix15 dy = *y - *y_o;
+              // Are both those differences less than the visual range?
+              if (dx < visualRange && dy < visualRange && dx > -visualRange && dy > -visualRange) {
+                  // If so, calculate the squared distance
+                  fix15 squared_distance = multfix15(dx,dx) + multfix15(dy,dy);
 
-                // Is squared distance less than the protected range?
-                if (squared_distance < multfix15(protectedRange,protectedRange)) { 
+                  // Is squared distance less than the protected range?
+                  if (squared_distance < multfix15(protectedRange,protectedRange)) { 
 
-                    // If so, calculate difference in x/y-coordinates to nearfield boid
-                    close_dx += dx;
-                    close_dy += dy;
+                      // If so, calculate difference in x/y-coordinates to nearfield boid
+                      close_dx += dx;
+                      close_dy += dy;
+                  }
+
+                  // If not in protected range, is the boid in the visual range?
+                  else if (squared_distance < multfix15(visualRange,visualRange)) {
+
+                      // Add other boid's x/y-coord and x/y vel to accumulator variables
+                      xpos_avg += *x_o;
+                      ypos_avg += *y_o;
+                      xvel_avg += *vx_o;
+                      yvel_avg += *vy_o;
+
+                      // Increment number of boids within visual range
+                      neighboring_boids += int2fix15(1);
+                  }
                 }
-
-                // If not in protected range, is the boid in the visual range?
-                else if (squared_distance < multfix15(visualRange,visualRange)) {
-
-                    // Add other boid's x/y-coord and x/y vel to accumulator variables
-                    xpos_avg += *x_o;
-                    ypos_avg += *y_o;
-                    xvel_avg += *vx_o;
-                    yvel_avg += *vy_o;
-
-                    // Increment number of boids within visual range
-                    neighboring_boids += int2fix15(1);
-                }
-              }
             }    
           }
 
@@ -579,7 +577,9 @@ static PT_THREAD (protothread_anim(struct pt *pt))
         drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, BLACK);
         // update boid's position and velocity
         boid_update(i) ;
-        drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, boid_list[i].color); 
+        if(boid_list[i].alive) {
+          drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, boid_list[i].color); 
+        }
 
       }
       dog_update();
