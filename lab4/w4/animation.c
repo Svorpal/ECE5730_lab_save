@@ -213,7 +213,6 @@ bool inHome(fix15 x, fix15 y) {
 }
 
 // check boundaries
-// 0 for rectangle, 1 for top/bot, 2 for left/right
 void boundary_check(int boid_num) {
   fix15* x = &boid_list[boid_num].pos_x;
   fix15* y = &boid_list[boid_num].pos_y;
