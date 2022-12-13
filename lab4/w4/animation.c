@@ -17,10 +17,10 @@
  *  - GPIO 11 ---> 1000 OHM resistor ---> joystick a dir dog ---> 3V3
  *  - GPIO 12 ---> 1000 OHM resistor ---> joystick s dir dog ---> 3V3
  *  - GPIO 13 ---> 1000 OHM resistor ---> joystick d dir dog ---> 3V3
- *  - GPIO 2 ---> 1000 OHM resistor ---> joystick w dir wolf ---> 3V3
- *  - GPIO 3 ---> 1000 OHM resistor ---> joystick a dir wolf ---> 3V3
- *  - GPIO 4 ---> 1000 OHM resistor ---> joystick s dir wolf ---> 3V3
- *  - GPIO 5 ---> 1000 OHM resistor ---> joystick d dir wolf ---> 3V3
+ *  - GPIO 2 ---> 1000 OHM resistor ---> button w dir wolf ---> 3V3
+ *  - GPIO 3 ---> 1000 OHM resistor ---> button a dir wolf ---> 3V3
+ *  - GPIO 4 ---> 1000 OHM resistor ---> button s dir wolf ---> 3V3
+ *  - GPIO 5 ---> 1000 OHM resistor ---> button d dir wolf ---> 3V3
  */
 
 // Include the VGA grahics library
