@@ -1,12 +1,26 @@
 
+/* 
+  shepdog project
+*/
+
 /**
  * HARDWARE CONNECTIONS
  *  - GPIO 16 ---> VGA Hsync
  *  - GPIO 17 ---> VGA Vsync
+ *
  *  - GPIO 18 ---> 330 ohm resistor ---> VGA Red
  *  - GPIO 19 ---> 330 ohm resistor ---> VGA Green
  *  - GPIO 20 ---> 330 ohm resistor ---> VGA Blue
  *  - RP2040 GND ---> VGA GND
+ * 
+ *  - GPIO 10 ---> 1000 OHM resistor ---> joystick w dir dog ---> 3V3
+ *  - GPIO 11 ---> 1000 OHM resistor ---> joystick a dir dog ---> 3V3
+ *  - GPIO 12 ---> 1000 OHM resistor ---> joystick s dir dog ---> 3V3
+ *  - GPIO 13 ---> 1000 OHM resistor ---> joystick d dir dog ---> 3V3
+ *  - GPIO 2 ---> 1000 OHM resistor ---> joystick w dir wolf ---> 3V3
+ *  - GPIO 3 ---> 1000 OHM resistor ---> joystick a dir wolf ---> 3V3
+ *  - GPIO 4 ---> 1000 OHM resistor ---> joystick s dir wolf ---> 3V3
+ *  - GPIO 5 ---> 1000 OHM resistor ---> joystick d dir wolf ---> 3V3
  */
 
 // Include the VGA grahics library
