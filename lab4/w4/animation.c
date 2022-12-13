@@ -1,10 +1,5 @@
 
 /**
- * Hunter Adams (vha3@cornell.edu)
- * 
- * This demonstration animates two balls bouncing about the screen.
- * Through a serial interface, the user can change the ball color.
- *
  * HARDWARE CONNECTIONS
  *  - GPIO 16 ---> VGA Hsync
  *  - GPIO 17 ---> VGA Vsync
@@ -12,12 +7,6 @@
  *  - GPIO 19 ---> 330 ohm resistor ---> VGA Green
  *  - GPIO 20 ---> 330 ohm resistor ---> VGA Blue
  *  - RP2040 GND ---> VGA GND
- *
- * RESOURCES USED
- *  - PIO state machines 0, 1, and 2 on PIO instance 0
- *  - DMA channels 0, 1
- *  - 153.6 kBytes of RAM (for pixel color data)
- *
  */
 
 // Include the VGA grahics library
@@ -97,9 +86,7 @@ fix15 maxdogspeed = float2fix15(10);
 fix15 sheep_shift_factor = float2fix15(0.05);
 
 
-
 // min and max functions
-
 fix15 max(fix15 num1, fix15 num2) {
   return (num1 > num2 ) ? num1 : num2;
 }
@@ -144,7 +131,7 @@ typedef struct list2 {
 
 Wolf wolf;
 
-
+// initialization
 void boid_initialize(Boid* b) {
     b->pos_x = 0;
     b->pos_y = 0;
@@ -259,11 +246,13 @@ void boid_update(int cur)
     fix15 close_dx_sw = 0;
     fix15 close_dy_sw = 0;
 
+    // is this sheep is near a wolf?
     fix15 sheep_wolf_dx = *x - *x_wolf;
     fix15 sheep_wolf_dy = *y - *y_wolf;
     fix15 squared_distance_sw = multfix15(sheep_wolf_dx,sheep_wolf_dx) + multfix15(sheep_wolf_dy,sheep_wolf_dy);
     if (squared_distance_sw < multfix15(sheepwolfRange,sheepwolfRange) && sheep_wolf_dx < sheepwolfRange && sheep_wolf_dy < sheepwolfRange && sheep_wolf_dx > multfix15(int2fix15(-1),sheepwolfRange) && sheep_wolf_dy > multfix15(int2fix15(-1),sheepwolfRange)) { 
-        if(!(*atHome)){
+      // not in the safe area -> mark sheep as dead
+      if(!(*atHome)){
           *isalive = false;
           drawRect(fix2int15(boid_list[cur].pos_x), fix2int15(boid_list[cur].pos_y), 2, 2, BLACK);
           boid_alive_num--;
@@ -282,9 +271,11 @@ void boid_update(int cur)
     fix15 close_dx_sd = 0;
     fix15 close_dy_sd = 0;
 
+    // is the sheep near a dog?
     fix15 sheep_dog_dx = *x - *x_dog;
     fix15 sheep_dog_dy = *y - *y_dog;
     fix15 squared_distance_sd = multfix15(sheep_dog_dx,sheep_dog_dx) + multfix15(sheep_dog_dy,sheep_dog_dy);
+    // if not at home, the sheep rans away from the dog
     if(!(*atHome)) {
       if (squared_distance_sd < multfix15(sheepDogRange,sheepDogRange)&& sheep_dog_dx < sheepDogRange && sheep_dog_dy < sheepDogRange && sheep_dog_dx > multfix15(int2fix15(-1),sheepDogRange) && sheep_dog_dy > multfix15(int2fix15(-1),sheepDogRange)) { 
           close_dx_sd += sheep_dog_dx;
@@ -293,6 +284,7 @@ void boid_update(int cur)
           *vy = *vy + multfix15(close_dy_sd,sheep_shift_factor);
 
       } else {
+        // boid algorithm
           fix15 xpos_avg = 0, ypos_avg = 0, xvel_avg = 0, yvel_avg = 0,  close_dx = 0, close_dy = 0;
           fix15 neighboring_boids = 0;
           for (int i = 0; i < boid_total_num; i++) {
@@ -303,9 +295,7 @@ void boid_update(int cur)
               fix15* vy_o = &boid_list[i].vy;
               bool* atHome_o = &boid_list[i].inCage;
               bool* isalive_o = &boid_list[i].alive;
-              // if(!(isalive_o)) {
-              //   continue;
-              // }
+              
               // Compute differences in x and y coordinates
               fix15 dx = *x - *x_o;
               fix15 dy = *y - *y_o;
@@ -358,6 +348,7 @@ void boid_update(int cur)
           *vy = *vy + multfix15(close_dy,avoidfactor);
       }
     } else {
+      // sheep in the same zone do Brownian motion 
       float home_speed = 1;
       float random_angle = (float)rand()/(float)(RAND_MAX) * (2*PI);
       *vx = float2fix15(home_speed *  (float) cos ((double) random_angle));
@@ -387,7 +378,8 @@ void boid_update(int cur)
     // Update position using velocity
     *x = *x + *vx ;
     *y = *y + *vy ;
-
+  
+    // does not allow sheep move out of home 
     if(*atHome) {
       if(*y <= int2fix15(390)) {
         *y = int2fix15(395);
@@ -406,6 +398,7 @@ void boid_update(int cur)
         *vx = -1;
       }
     }
+  // enforce strict border limits for sheep not at home as well
     else{
       if(*x >= int2fix15(540)) {
       *x = int2fix15(535);
@@ -512,41 +505,14 @@ void wolf_update() {
       *y = int2fix15(375);
     }
 }
-// ==================================================
-// === users serial input thread
-// ==================================================
+// =======================================================
+// === users serial input thread, not used in this project
+// =======================================================
 static PT_THREAD (protothread_serial(struct pt *pt))
 {
     PT_BEGIN(pt);
-    // stores user input
-    static char user_input ;
-    // wait for 0.1 sec
-    PT_YIELD_usec(1000000) ;
-    // announce the threader version
-    sprintf(pt_serial_out_buffer, "Protothreads RP2040 v1.0\n\r");
-    // non-blocking write
-    serial_write ;
-      while(1) {
-        // print prompt
-        sprintf(pt_serial_out_buffer, "input shepherd dog direction ");
-        // non-blocking write
-        serial_write ;
-        // spawn a thread to do the non-blocking serial read
-        serial_read ;
-        // convert input string to number
-        sscanf(pt_serial_in_buffer,"%c", &user_input) ;
-        // if(user_input == 'w')
-        // shep.vx = shep.vx - int2fix15(1);
-        // else if(user_input == 'a')
-        // shep.vy = shep.vy - int2fix15(1);
-        // else if(user_input == 's')
-        // shep.vx = shep.vx + int2fix15(1);
-        // else if(user_input == 'd')
-        // shep.vx = shep.vx + int2fix15(1);
-      }
-
-  PT_END(pt);
-} // timer thread
+    PT_END(pt);
+} 
 
 // Animation on core 0
 static PT_THREAD (protothread_anim(struct pt *pt))
@@ -570,18 +536,21 @@ static PT_THREAD (protothread_anim(struct pt *pt))
       drawRect(fix2int15(shep.pos_x) - 2, fix2int15(shep.pos_y) - 2, 5, 5, BLACK);
       drawRect(fix2int15(wolf.pos_x) - 2, fix2int15(wolf.pos_y) - 2, 5, 5, BLACK);  
       for(int i = 0; i < boid_total_num; i++) {
+        // Do not draw dead sheep
         if(boid_list[i].alive == false) {
           continue;
         }
-        // erase boids
+        // erase previous sheep drawing
         drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, BLACK);
-        // update boid's position and velocity
+        // update sheep's position and velocity
         boid_update(i) ;
+        // draw sheep's new positions if alive
         if(boid_list[i].alive) {
           drawRect(fix2int15(boid_list[i].pos_x), fix2int15(boid_list[i].pos_y), 2, 2, boid_list[i].color); 
         }
 
       }
+      // update dog and wolf
       dog_update();
       drawRect(fix2int15(shep.pos_x) - 2, fix2int15(shep.pos_y) - 2, 5, 5, RED);
       wolf_update();
@@ -591,6 +560,7 @@ static PT_THREAD (protothread_anim(struct pt *pt))
       // delay in accordance with frame rate
       spare_time = FRAME_RATE - (time_us_32() - begin_time) ;
 
+      // VGA caption display
       setTextColor(WHITE);
       setCursor(32,0);
       setTextSize(1);
@@ -632,8 +602,7 @@ static PT_THREAD (protothread_anim(struct pt *pt))
       sprintf(teltext,"%d",(int)(time_us_32()/1000000));
       setCursor(600,40);
       writeString(teltext);
-
-
+      
       // yield for necessary amount of time
       PT_YIELD_usec(spare_time) ;
      // NEVER exit while
@@ -642,7 +611,7 @@ static PT_THREAD (protothread_anim(struct pt *pt))
 } // animation thread
 
 
-// Animation on core 1
+// Animation on core 1, not used
 static PT_THREAD (protothread_anim1(struct pt *pt))
 {
   // Mark beginning of thread
